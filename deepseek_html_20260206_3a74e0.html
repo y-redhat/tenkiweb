@@ -1,0 +1,1900 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>平安時代気象再現システム - 完全物理モデル</title>
+    <style>
+        :root {
+            --primary-color: #1a237e;
+            --secondary-color: #283593;
+            --accent-color: #536dfe;
+            --warning-color: #ff6b6b;
+            --success-color: #4caf50;
+            --text-primary: #333;
+            --text-secondary: #666;
+            --bg-primary: #f5f7ff;
+            --bg-secondary: #e8eaf6;
+            --bg-card: #ffffff;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic Pro', sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+        
+        /* ヘッダー */
+        .header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 2rem;
+            border-radius: 15px;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(26, 35, 126, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+        
+        .header .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        /* メインコンテンツ */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 25px;
+            margin-bottom: 25px;
+        }
+        
+        @media (max-width: 1200px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* コントロールパネル */
+        .control-panel {
+            background: var(--bg-card);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+            height: fit-content;
+        }
+        
+        .section-title {
+            font-size: 1.2rem;
+            color: var(--primary-color);
+            margin: 25px 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--bg-secondary);
+            font-weight: 600;
+        }
+        
+        .section-title:first-child {
+            margin-top: 0;
+        }
+        
+        /* 入力要素 */
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+        
+        select, input[type="range"], input[type="number"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            background: white;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+        
+        select:focus, input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(83, 109, 254, 0.1);
+        }
+        
+        .slider-value {
+            text-align: center;
+            margin-top: 5px;
+            color: var(--accent-color);
+            font-weight: bold;
+        }
+        
+        /* 場所選択 */
+        .location-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .location-btn {
+            padding: 12px;
+            border: 2px solid var(--bg-secondary);
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+        
+        .location-btn:hover {
+            border-color: var(--accent-color);
+            transform: translateY(-2px);
+        }
+        
+        .location-btn.active {
+            background: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+        
+        /* 気象条件選択 */
+        .weather-condition {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .condition-btn {
+            padding: 15px;
+            border: 2px solid var(--bg-secondary);
+            border-radius: 10px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+        
+        .condition-btn:hover {
+            border-color: var(--accent-color);
+            transform: translateY(-2px);
+        }
+        
+        .condition-btn.active {
+            background: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+        
+        .condition-icon {
+            font-size: 2rem;
+            margin-bottom: 5px;
+        }
+        
+        /* ボタン */
+        .button-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-top: 25px;
+        }
+        
+        .btn {
+            padding: 14px 20px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-color), #3d5afe);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(83, 109, 254, 0.3);
+        }
+        
+        /* マップコンテナ */
+        .map-container {
+            background: var(--bg-card);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+            position: relative;
+            min-height: 800px;
+        }
+        
+        .map-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--bg-secondary);
+        }
+        
+        .era-display {
+            font-size: 1.8rem;
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+        
+        #weatherCanvas {
+            width: 100%;
+            height: 700px;
+            border-radius: 10px;
+            border: 2px solid var(--bg-secondary);
+            background: #e8f4f8;
+        }
+        
+        /* 公式パネル */
+        .formula-panel {
+            background: var(--bg-card);
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 25px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+        }
+        
+        .formula-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .formula-card {
+            background: var(--bg-secondary);
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 5px solid var(--accent-color);
+        }
+        
+        .formula-name {
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+        
+        .formula-equation {
+            font-family: 'Courier New', monospace;
+            background: var(--primary-color);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 1rem;
+            overflow-x: auto;
+        }
+        
+        .formula-value {
+            color: var(--warning-color);
+            font-weight: bold;
+        }
+        
+        .formula-details {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        
+        /* 凡例 */
+        .legend {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            padding: 15px;
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        
+        /* アニメーション */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .main-grid {
+                gap: 15px;
+            }
+            
+            .weather-condition {
+                grid-template-columns: 1fr;
+            }
+            
+            .formula-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ヘッダー -->
+        <header class="header">
+            <h1>平安時代気象再現システム</h1>
+            <p class="subtitle">完全物理モデル × 動的気圧場 × 歴史的文献統合</p>
+        </header>
+        
+        <!-- メインコンテンツ -->
+        <div class="main-grid">
+            <!-- 左側: コントロールパネル -->
+            <div class="control-panel">
+                <!-- 時代選択 -->
+                <div class="section-title">
+                    <i class="fas fa-history"></i>
+                    時代選択
+                </div>
+                
+                <div class="input-group">
+                    <label for="yearSelect">西暦指定 (794-1185)</label>
+                    <input type="range" id="yearSelect" min="794" max="1185" value="1000" step="1">
+                    <div class="slider-value" id="yearValue">平安中期 (1000年)</div>
+                </div>
+                
+                <!-- 場所選択 -->
+                <div class="section-title">
+                    <i class="fas fa-map-marker-alt"></i>
+                    場所選択
+                </div>
+                
+                <div class="location-buttons">
+                    <button class="location-btn active" data-location="kyoto">京都</button>
+                    <button class="location-btn" data-location="nara">奈良</button>
+                    <button class="location-btn" data-location="kamakura">鎌倉</button>
+                    <button class="location-btn" data-location="hakata">博多</button>
+                    <button class="location-btn" data-location="osaka">大坂</button>
+                    <button class="location-btn" data-location="sendai">仙台</button>
+                </div>
+                
+                <!-- 気象条件 -->
+                <div class="section-title">
+                    <i class="fas fa-cloud"></i>
+                    気象条件
+                </div>
+                
+                <div class="weather-condition">
+                    <button class="condition-btn" data-weather="sunny">
+                        <div class="condition-icon">☀️</div>
+                        <div>晴れ</div>
+                    </button>
+                    <button class="condition-btn" data-weather="cloudy">
+                        <div class="condition-icon">☁️</div>
+                        <div>曇り</div>
+                    </button>
+                    <button class="condition-btn" data-weather="rainy">
+                        <div class="condition-icon">🌧️</div>
+                        <div>雨</div>
+                    </button>
+                    <button class="condition-btn" data-weather="snowy">
+                        <div class="condition-icon">❄️</div>
+                        <div>雪</div>
+                    </button>
+                    <button class="condition-btn" data-weather="stormy">
+                        <div class="condition-icon">⛈️</div>
+                        <div>嵐</div>
+                    </button>
+                    <button class="condition-btn" data-weather="foggy">
+                        <div class="condition-icon">🌫️</div>
+                        <div>霧</div>
+                    </button>
+                </div>
+                
+                <!-- 物理パラメータ -->
+                <div class="section-title">
+                    <i class="fas fa-sliders-h"></i>
+                    物理パラメータ
+                </div>
+                
+                <div class="input-group">
+                    <label for="temperature">平均気温: <span id="tempValue">24.5</span>°C</label>
+                    <input type="range" id="temperature" min="20" max="30" value="24.5" step="0.1">
+                </div>
+                
+                <div class="input-group">
+                    <label for="humidity">湿度: <span id="humidityValue">60</span>%</label>
+                    <input type="range" id="humidity" min="30" max="100" value="60" step="1">
+                </div>
+                
+                <div class="input-group">
+                    <label for="pressure">基準気圧: <span id="pressureValue">1013</span> hPa</label>
+                    <input type="range" id="pressure" min="980" max="1040" value="1013" step="1">
+                </div>
+                
+                <div class="input-group">
+                    <label for="enso">ENSO指数: <span id="ensoValue">0.0</span></label>
+                    <input type="range" id="enso" min="-2" max="2" value="0" step="0.1">
+                </div>
+                
+                <!-- 操作ボタン -->
+                <div class="section-title">
+                    <i class="fas fa-cogs"></i>
+                    操作
+                </div>
+                
+                <div class="button-group">
+                    <button class="btn btn-primary" id="generateBtn">
+                        <i class="fas fa-bolt"></i>
+                        気象生成
+                    </button>
+                    <button class="btn btn-primary" id="animateBtn">
+                        <i class="fas fa-play"></i>
+                        アニメーション開始
+                    </button>
+                    <button class="btn btn-primary" id="formulaBtn">
+                        <i class="fas fa-calculator"></i>
+                        公式表示
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 右側: 地図表示 -->
+            <div class="map-container">
+                <div class="map-header">
+                    <div class="era-display" id="eraDisplay">平安中期 (西暦1000年)</div>
+                    <div>
+                        <div id="weatherDisplay">天気: 晴れ</div>
+                        <div id="locationDisplay">場所: 京都</div>
+                    </div>
+                </div>
+                
+                <canvas id="weatherCanvas"></canvas>
+                
+                <!-- 凡例 -->
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #0066CC;"></div>
+                        <span>高気圧中心</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #CC0000;"></div>
+                        <span>低気圧中心</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #009900;"></div>
+                        <span>等圧線 (4hPa間隔)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #FF9900;"></div>
+                        <span>温暖域</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #0000CC;"></div>
+                        <span>寒冷域</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 公式パネル -->
+        <div class="formula-panel" id="formulaPanel">
+            <h3 style="color: var(--primary-color); margin-bottom: 20px;">
+                <i class="fas fa-square-root-alt"></i>
+                使用した気象学公式
+            </h3>
+            
+            <div class="formula-grid" id="formulasList">
+                <!-- 公式がここに動的に追加されます -->
+            </div>
+        </div>
+    </div>
+
+    <!-- スクリプト -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></script>
+    
+    <script>
+        // ==================== 1. 完全物理モデル気象エンジン ====================
+        class CompleteMeteorologicalEngine {
+            constructor() {
+                // 物理定数
+                this.constants = {
+                    // 放射・温度系
+                    SOLAR_CONSTANT: 1361,           // 太陽定数 (W/m²)
+                    STEFAN_BOLTZMANN: 5.67e-8,      // ステファン・ボルツマン定数
+                    ALBEDO_EARTH: 0.3,              // 地球アルベド
+                    CLIMATE_SENSITIVITY: 0.8,       // 気候感度 (K/(W/m²))
+                    
+                    // 気圧・高度系
+                    GRAVITY: 9.80665,               // 重力加速度 (m/s²)
+                    SCALE_HEIGHT: 8400,             // スケールハイト (m)
+                    GAS_CONSTANT_DRY: 287.05,       // 乾燥空気の気体定数 (J/(kg·K))
+                    
+                    // 風・回転系
+                    EARTH_OMEGA: 7.2921e-5,         // 地球自転角速度 (rad/s)
+                    AIR_DENSITY: 1.225,             // 標準空気密度 (kg/m³)
+                    
+                    // 湿度・熱力学
+                    LAPSE_RATE: 6.5,                // 気温減率 (K/km)
+                    DRY_ADIABATIC_LAPSE: 9.8,       // 乾燥断熱減率 (K/km)
+                    CP_AIR: 1005,                   // 定圧比熱 (J/(kg·K))
+                    
+                    // 季節・天文
+                    OBLIQUITY: 23.44,               // 黄道傾斜角 (度)
+                    DAYS_PER_YEAR: 365.25
+                };
+            }
+            
+            // 🌞 1. 放射・気温系
+            radiativeEquilibrium(albedo = this.constants.ALBEDO_EARTH) {
+                const S = this.constants.SOLAR_CONSTANT;
+                const sigma = this.constants.STEFAN_BOLTZMANN;
+                const T = Math.pow((1 - albedo) * S / (4 * sigma), 0.25) - 273.15;
+                
+                return {
+                    value: T,
+                    formula: "(1-α)S/4 = σT⁴",
+                    explanation: "放射平衡温度 (地球平均)",
+                    details: {
+                        albedo: albedo,
+                        solarConstant: S,
+                        stefanBoltzmann: sigma.toExponential(2)
+                    }
+                };
+            }
+            
+            radiativeForcing(deltaF, lambda = this.constants.CLIMATE_SENSITIVITY) {
+                const deltaT = lambda * deltaF;
+                
+                return {
+                    value: deltaT,
+                    formula: "ΔT = λ·ΔF",
+                    explanation: "放射強制力による気温変化",
+                    details: {
+                        deltaF: deltaF,
+                        lambda: lambda,
+                        unit: "K/(W/m²)"
+                    }
+                };
+            }
+            
+            lapseRateCorrection(temp, height) {
+                const correctedTemp = temp - this.constants.LAPSE_RATE * (height / 1000);
+                
+                return {
+                    value: correctedTemp,
+                    formula: "T(z) = T₀ - Γ·z",
+                    explanation: "標高補正 (気温減率)",
+                    details: {
+                        initialTemp: temp,
+                        height: height,
+                        lapseRate: this.constants.LAPSE_RATE,
+                        unit: "K/km"
+                    }
+                };
+            }
+            
+            // 🧱 2. 気圧・高度の公式
+            hydrostaticBalance(p0, rho, g = this.constants.GRAVITY) {
+                const dpdz = -rho * g;
+                
+                return {
+                    value: dpdz,
+                    formula: "dp/dz = -ρg",
+                    explanation: "静水圧平衡",
+                    details: {
+                        density: rho,
+                        gravity: g,
+                        unit: "Pa/m"
+                    }
+                };
+            }
+            
+            pressureAtHeight(P0, z, H = this.constants.SCALE_HEIGHT) {
+                const P = P0 * Math.exp(-z / H);
+                
+                return {
+                    value: P,
+                    formula: "P(z) = P₀·exp(-z/H)",
+                    explanation: "気圧高度式",
+                    details: {
+                        P0: P0,
+                        height: z,
+                        scaleHeight: H
+                    }
+                };
+            }
+            
+            idealGasLaw(P, T) {
+                const rho = P / (this.constants.GAS_CONSTANT_DRY * (T + 273.15));
+                
+                return {
+                    value: rho,
+                    formula: "P = ρRT",
+                    explanation: "状態方程式 (乾燥空気)",
+                    details: {
+                        pressure: P,
+                        temperature: T,
+                        gasConstant: this.constants.GAS_CONSTANT_DRY
+                    }
+                };
+            }
+            
+            // 🌬️ 3. 風の公式
+            coriolisParameter(latitude) {
+                const f = 2 * this.constants.EARTH_OMEGA * Math.sin(latitude * Math.PI / 180);
+                
+                return {
+                    value: f,
+                    formula: "f = 2Ωsinφ",
+                    explanation: "コリオリパラメータ",
+                    details: {
+                        latitude: latitude,
+                        omega: this.constants.EARTH_OMEGA.toExponential(3),
+                        unit: "s⁻¹"
+                    }
+                };
+            }
+            
+            geostrophicWind(pressureGradient, latitude) {
+                const f = this.coriolisParameter(latitude).value;
+                const rho = this.constants.AIR_DENSITY;
+                
+                const Vg = (1 / (rho * f)) * pressureGradient;
+                
+                return {
+                    speed: Math.abs(Vg),
+                    direction: pressureGradient > 0 ? 90 : 270,
+                    formula: "fv = (1/ρ)·∂p/∂x",
+                    explanation: "地衡風 (北半球)",
+                    details: {
+                        pressureGradient: pressureGradient,
+                        coriolis: f.toExponential(3),
+                        density: rho,
+                        unit: "m/s"
+                    }
+                };
+            }
+            
+            windSpeed(u, v) {
+                const speed = Math.sqrt(u * u + v * v);
+                
+                return {
+                    value: speed,
+                    formula: "|v| = √(u² + v²)",
+                    explanation: "風速の大きさ",
+                    details: {
+                        uComponent: u,
+                        vComponent: v
+                    }
+                };
+            }
+            
+            // 💧 4. 湿度・水蒸気
+            saturationVaporPressure(T) {
+                const es = 6.11 * Math.exp(17.27 * T / (T + 237.3));
+                
+                return {
+                    value: es,
+                    formula: "eₛ = 6.11·exp(17.27T/(T+237.3))",
+                    explanation: "飽和水蒸気圧 (マグヌス式)",
+                    details: {
+                        temperature: T,
+                        unit: "hPa"
+                    }
+                };
+            }
+            
+            relativeHumidity(e, es) {
+                const RH = (e / es) * 100;
+                
+                return {
+                    value: RH,
+                    formula: "RH = (e/eₛ)×100",
+                    explanation: "相対湿度",
+                    details: {
+                        vaporPressure: e,
+                        saturationPressure: es,
+                        unit: "%"
+                    }
+                };
+            }
+            
+            specificHumidity(e, P) {
+                const q = 0.622 * e / (P - 0.378 * e);
+                
+                return {
+                    value: q,
+                    formula: "q = 0.622e/(P-0.378e)",
+                    explanation: "比湿",
+                    details: {
+                        vaporPressure: e,
+                        pressure: P,
+                        unit: "kg/kg"
+                    }
+                };
+            }
+            
+            // 🌧️ 5. 降水・雲
+            upwardMotionCondition(divergence) {
+                const upward = divergence < 0;
+                
+                return {
+                    value: upward,
+                    formula: "∇·v < 0 → 上昇流",
+                    explanation: "上昇流判定",
+                    details: {
+                        divergence: divergence,
+                        condition: upward ? "上昇" : "下降"
+                    }
+                };
+            }
+            
+            rainfallEstimate(RH, w, a = 0.01) {
+                const rain = a * RH * w;
+                
+                return {
+                    value: rain,
+                    formula: "Rain ≈ a·RH·w",
+                    explanation: "降水量モデル (経験式)",
+                    details: {
+                        humidity: RH,
+                        updraft: w,
+                        coefficient: a,
+                        unit: "mm/h"
+                    }
+                };
+            }
+            
+            cloudCoverEstimate(RH) {
+                const cloud = RH * RH / 10000; // RH² のスケーリング
+                
+                return {
+                    value: cloud,
+                    formula: "Cloud ≈ RH²",
+                    explanation: "雲量推定",
+                    details: {
+                        relativeHumidity: RH,
+                        unit: "割合 (0-1)"
+                    }
+                };
+            }
+            
+            // 🔺 6. 前線・気団
+            frontIntensity(temperatureGradient) {
+                const intensity = Math.abs(temperatureGradient);
+                
+                return {
+                    value: intensity,
+                    formula: "F = |∇T|",
+                    explanation: "前線強度 (温度勾配)",
+                    details: {
+                        gradient: temperatureGradient,
+                        unit: "K/km"
+                    }
+                };
+            }
+            
+            temperatureAdvection(vx, vy, dTdx, dTdy) {
+                const advection = -(vx * dTdx + vy * dTdy);
+                
+                return {
+                    value: advection,
+                    formula: "∂T/∂t = -v·∇T",
+                    explanation: "温度移流",
+                    details: {
+                        windX: vx,
+                        windY: vy,
+                        gradX: dTdx,
+                        gradY: dTdy,
+                        unit: "K/s"
+                    }
+                };
+            }
+            
+            // 🧠 7. 大気安定度
+            dryAdiabaticLapseRate() {
+                const gamma_d = this.constants.GRAVITY / this.constants.CP_AIR;
+                
+                return {
+                    value: gamma_d * 1000, // K/km
+                    formula: "Γₔ = g/cₚ",
+                    explanation: "乾燥断熱減率",
+                    details: {
+                        gravity: this.constants.GRAVITY,
+                        specificHeat: this.constants.CP_AIR,
+                        unit: "K/km"
+                    }
+                };
+            }
+            
+            stabilityCondition(environmentLapse, dryAdiabaticLapse) {
+                const stable = environmentLapse < dryAdiabaticLapse;
+                
+                return {
+                    value: stable,
+                    formula: "Γₑₙᵥ < Γₔ → 安定",
+                    explanation: "大気安定度判定",
+                    details: {
+                        envLapse: environmentLapse,
+                        dryLapse: dryAdiabaticLapse,
+                        condition: stable ? "安定" : "不安定"
+                    }
+                };
+            }
+            
+            // 🌏 8. 大循環・季節
+            solarAltitudeAngle(latitude, declination, hourAngle) {
+                const phi = latitude * Math.PI / 180;
+                const delta = declination * Math.PI / 180;
+                const H = hourAngle * Math.PI / 12;
+                
+                const sinh = Math.sin(phi) * Math.sin(delta) + 
+                           Math.cos(phi) * Math.cos(delta) * Math.cos(H);
+                
+                return {
+                    value: Math.asin(Math.max(-1, Math.min(1, sinh))) * 180 / Math.PI,
+                    formula: "sinh = sinφ sinδ + cosφ cosδ cosH",
+                    explanation: "太陽高度角",
+                    details: {
+                        latitude: latitude,
+                        declination: declination,
+                        hourAngle: hourAngle,
+                        unit: "度"
+                    }
+                };
+            }
+            
+            monsoonIndex(landTemp, seaTemp) {
+                const index = landTemp - seaTemp;
+                
+                return {
+                    value: index,
+                    formula: "Monsoon ∝ ΔT(land-sea)",
+                    explanation: "モンスーン指標",
+                    details: {
+                        landTemperature: landTemp,
+                        seaTemperature: seaTemp
+                    }
+                };
+            }
+            
+            // 🧪 9. 誤差・補正
+            movingAverage(data, window) {
+                const result = data.map((_, i) => {
+                    const start = Math.max(0, i - window);
+                    const end = i + 1;
+                    const subset = data.slice(start, end);
+                    return subset.reduce((a, b) => a + b, 0) / subset.length;
+                });
+                
+                return {
+                    value: result,
+                    formula: "MA(t) = Σx(t-i)/n",
+                    explanation: "移動平均 (平滑化)",
+                    details: {
+                        windowSize: window,
+                        dataLength: data.length
+                    }
+                };
+            }
+            
+            biasCorrection(rawTemp, rawMean, obsMean) {
+                const corrected = rawTemp - rawMean + obsMean;
+                
+                return {
+                    value: corrected,
+                    formula: "T_adj = T_raw - mean_raw + mean_obs",
+                    explanation: "バイアス補正",
+                    details: {
+                        rawTemperature: rawTemp,
+                        rawMean: rawMean,
+                        observedMean: obsMean
+                    }
+                };
+            }
+            
+            uncertaintyPropagation(sigma1, sigma2) {
+                const combined = Math.sqrt(sigma1 * sigma1 + sigma2 * sigma2);
+                
+                return {
+                    value: combined,
+                    formula: "σ² = σ₁² + σ₂²",
+                    explanation: "不確実性伝播",
+                    details: {
+                        sigma1: sigma1,
+                        sigma2: sigma2
+                    }
+                };
+            }
+        }
+        
+        // ==================== 2. 動的気圧場生成クラス ====================
+        class DynamicPressureField {
+            constructor() {
+                this.engine = new CompleteMeteorologicalEngine();
+                this.lowPressureCenters = [];
+                this.highPressureCenters = [];
+                this.isobars = [];
+                this.windField = [];
+                this.timeStep = 0;
+            }
+            
+            generatePressureField(location, weather, temperature, humidity, basePressure, ensoIndex) {
+                // 場所に基づく基準座標
+                const locations = {
+                    kyoto: { lat: 35.0116, lon: 135.7681, elevation: 50 },
+                    nara: { lat: 34.6851, lon: 135.8048, elevation: 75 },
+                    kamakura: { lat: 35.3192, lon: 139.5500, elevation: 15 },
+                    hakata: { lat: 33.5902, lon: 130.4017, elevation: 10 },
+                    osaka: { lat: 34.6937, lon: 135.5023, elevation: 20 },
+                    sendai: { lat: 38.2682, lon: 140.8694, elevation: 45 }
+                };
+                
+                const loc = locations[location] || locations.kyoto;
+                
+                // 天気条件に基づく気圧配置
+                const weatherPatterns = {
+                    sunny: { 
+                        pattern: "high_dominant",
+                        pressureOffset: 15,
+                        lowCount: 1,
+                        highCount: 2
+                    },
+                    cloudy: { 
+                        pattern: "balanced",
+                        pressureOffset: 5,
+                        lowCount: 2,
+                        highCount: 2
+                    },
+                    rainy: { 
+                        pattern: "low_dominant",
+                        pressureOffset: -10,
+                        lowCount: 3,
+                        highCount: 1
+                    },
+                    snowy: { 
+                        pattern: "cold_low",
+                        pressureOffset: -5,
+                        lowCount: 2,
+                        highCount: 1
+                    },
+                    stormy: { 
+                        pattern: "deep_low",
+                        pressureOffset: -20,
+                        lowCount: 4,
+                        highCount: 0
+                    },
+                    foggy: { 
+                        pattern: "weak_gradient",
+                        pressureOffset: 0,
+                        lowCount: 1,
+                        highCount: 1
+                    }
+                };
+                
+                const pattern = weatherPatterns[weather] || weatherPatterns.sunny;
+                
+                // 低気圧中心の生成（雨の場合は周囲にばらまく）
+                this.lowPressureCenters = [];
+                for (let i = 0; i < pattern.lowCount; i++) {
+                    let lat, lon;
+                    
+                    if (weather === 'rainy' && i > 0) {
+                        // 雨の場合は中心からランダムに配置
+                        const angle = (i * 72) * Math.PI / 180; // 72度間隔
+                        const distance = 1.5 + Math.random() * 1.0; // 1.5-2.5度
+                        lat = loc.lat + distance * Math.sin(angle);
+                        lon = loc.lon + distance * Math.cos(angle);
+                    } else {
+                        // 主要な低気圧
+                        lat = loc.lat + (Math.random() - 0.5) * 2;
+                        lon = loc.lon + (Math.random() - 0.5) * 2;
+                    }
+                    
+                    const pressure = basePressure + pattern.pressureOffset + 
+                                   (Math.random() - 0.5) * 10 - i * 3;
+                    
+                    this.lowPressureCenters.push({
+                        id: `low_${i}`,
+                        lat: lat,
+                        lon: lon,
+                        pressure: pressure,
+                        radius: 200 + Math.random() * 200, // km
+                        intensity: 1.0 + Math.random() * 0.5,
+                        movement: this.calculateMovement(lat, lon, 'low', weather)
+                    });
+                }
+                
+                // 高気圧中心の生成
+                this.highPressureCenters = [];
+                for (let i = 0; i < pattern.highCount; i++) {
+                    // 低気圧から離れた位置に配置
+                    const angle = (i * 120) * Math.PI / 180;
+                    const distance = 3 + Math.random() * 2;
+                    
+                    this.highPressureCenters.push({
+                        id: `high_${i}`,
+                        lat: loc.lat + distance * Math.sin(angle),
+                        lon: loc.lon + distance * Math.cos(angle),
+                        pressure: basePressure + 20 + (Math.random() - 0.5) * 8,
+                        radius: 300 + Math.random() * 200,
+                        intensity: 0.8 + Math.random() * 0.4,
+                        movement: this.calculateMovement(lat, lon, 'high', weather)
+                    });
+                }
+                
+                // 等圧線の生成
+                this.generateIsobars();
+                
+                // 風場の計算
+                this.calculateWindField();
+                
+                return {
+                    lows: this.lowPressureCenters,
+                    highs: this.highPressureCenters,
+                    isobars: this.isobars,
+                    winds: this.windField,
+                    location: loc,
+                    weather: weather,
+                    timestamp: new Date().toISOString()
+                };
+            }
+            
+            calculateMovement(lat, lon, type, weather) {
+                // 基本的な移動ベクトル（季節と天候による）
+                let speed, direction;
+                
+                if (type === 'low') {
+                    speed = 25 + (weather === 'stormy' ? 15 : 0);
+                    direction = 60 + (Math.random() - 0.5) * 30; // 東北東寄り
+                } else {
+                    speed = 10 + (Math.random() - 0.5) * 5;
+                    direction = 240 + (Math.random() - 0.5) * 60; // 西南西寄り
+                }
+                
+                // ENSOの影響
+                const enso = parseFloat(document.getElementById('enso').value);
+                speed *= (1 + Math.abs(enso) * 0.1);
+                
+                return {
+                    speed: speed,
+                    direction: direction,
+                    dx: speed * Math.cos(direction * Math.PI / 180) / 111.32,
+                    dy: speed * Math.sin(direction * Math.PI / 180) / 111.32
+                };
+            }
+            
+            generateIsobars() {
+                this.isobars = [];
+                const interval = 4; // 4hPa間隔
+                
+                // 低気圧中心からの等圧線
+                this.lowPressureCenters.forEach(low => {
+                    for (let p = Math.floor(low.pressure); p <= Math.floor(low.pressure) + 20; p += interval) {
+                        if (p % interval === 0) {
+                            this.isobars.push({
+                                pressure: p,
+                                center: { lat: low.lat, lon: low.lon },
+                                radius: this.pressureToRadius(low.pressure, p, low.radius),
+                                type: 'low'
+                            });
+                        }
+                    }
+                });
+                
+                // 高気圧中心からの等圧線
+                this.highPressureCenters.forEach(high => {
+                    for (let p = Math.floor(high.pressure); p >= Math.floor(high.pressure) - 20; p -= interval) {
+                        if (p % interval === 0) {
+                            this.isobars.push({
+                                pressure: p,
+                                center: { lat: high.lat, lon: high.lon },
+                                radius: this.pressureToRadius(high.pressure, p, high.radius),
+                                type: 'high'
+                            });
+                        }
+                    }
+                });
+            }
+            
+            pressureToRadius(centerPressure, isobarPressure, baseRadius) {
+                const pressureDiff = Math.abs(centerPressure - isobarPressure);
+                return baseRadius * (1 + pressureDiff / 5); // 気圧差に比例して拡大
+            }
+            
+            calculateWindField() {
+                this.windField = [];
+                
+                // グリッドポイントでの風を計算
+                for (let lat = 30; lat <= 45; lat += 1) {
+                    for (let lon = 125; lon <= 145; lon += 1.5) {
+                        // 気圧勾配の計算
+                        let pressureGradientX = 0;
+                        let pressureGradientY = 0;
+                        
+                        // 低気圧からの寄与
+                        this.lowPressureCenters.forEach(low => {
+                            const dx = (lon - low.lon) * 111.32 * Math.cos(lat * Math.PI / 180);
+                            const dy = (lat - low.lat) * 111.32;
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+                            
+                            if (distance < low.radius) {
+                                const influence = (low.radius - distance) / low.radius;
+                                pressureGradientX += influence * (lon - low.lon) / distance * low.intensity;
+                                pressureGradientY += influence * (lat - low.lat) / distance * low.intensity;
+                            }
+                        });
+                        
+                        // 高気圧からの寄与（符号反転）
+                        this.highPressureCenters.forEach(high => {
+                            const dx = (lon - high.lon) * 111.32 * Math.cos(lat * Math.PI / 180);
+                            const dy = (lat - high.lat) * 111.32;
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+                            
+                            if (distance < high.radius) {
+                                const influence = (high.radius - distance) / high.radius;
+                                pressureGradientX -= influence * (lon - high.lon) / distance * high.intensity;
+                                pressureGradientY -= influence * (lat - high.lat) / distance * high.intensity;
+                            }
+                        });
+                        
+                        // 地衡風の計算
+                        if (Math.abs(pressureGradientX) > 0.001 || Math.abs(pressureGradientY) > 0.001) {
+                            const gradient = Math.sqrt(pressureGradientX * pressureGradientX + pressureGradientY * pressureGradientY);
+                            const wind = this.engine.geostrophicWind(gradient, lat);
+                            
+                            // 風向の計算（気圧傾度力の90度右）
+                            let direction = Math.atan2(pressureGradientY, pressureGradientX) * 180 / Math.PI + 90;
+                            if (direction < 0) direction += 360;
+                            if (direction >= 360) direction -= 360;
+                            
+                            this.windField.push({
+                                lat: lat,
+                                lon: lon,
+                                speed: wind.speed,
+                                direction: direction,
+                                u: wind.speed * Math.cos(direction * Math.PI / 180),
+                                v: wind.speed * Math.sin(direction * Math.PI / 180)
+                            });
+                        }
+                    }
+                }
+            }
+            
+            // アニメーション用の時間ステップ更新
+            updateTimeStep() {
+                this.timeStep++;
+                
+                // 低気圧の移動
+                this.lowPressureCenters.forEach(low => {
+                    low.lat += low.movement.dy * 0.1;
+                    low.lon += low.movement.dx * 0.1;
+                    
+                    // 境界処理
+                    if (low.lat < 30) low.lat = 30;
+                    if (low.lat > 45) low.lat = 45;
+                    if (low.lon < 125) low.lon = 125;
+                    if (low.lon > 145) low.lon = 145;
+                });
+                
+                // 高気圧の移動
+                this.highPressureCenters.forEach(high => {
+                    high.lat += high.movement.dy * 0.05;
+                    high.lon += high.movement.dx * 0.05;
+                    
+                    // 境界処理
+                    if (high.lat < 30) high.lat = 30;
+                    if (high.lat > 45) high.lat = 45;
+                    if (high.lon < 125) high.lon = 125;
+                    if (high.lon > 145) high.lon = 145;
+                });
+                
+                // 等圧線と風場を再計算
+                this.generateIsobars();
+                this.calculateWindField();
+            }
+        }
+        
+        // ==================== 3. 天気図描画クラス ====================
+        class WeatherMapRenderer {
+            constructor(canvasId) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.width = this.canvas.width = this.canvas.parentElement.clientWidth;
+                this.height = this.canvas.height = 700;
+                
+                // 地図画像（あなたの提供された日本地図）
+                this.mapImage = new Image();
+                this.mapImage.src = 'japanmap.png'; // あなたの地図画像ファイル
+                this.mapImage.onload = () => this.drawMap();
+                
+                // 座標変換パラメータ（日本周辺）
+                this.mapBounds = {
+                    minLat: 30,
+                    maxLat: 45,
+                    minLon: 125,
+                    maxLon: 145
+                };
+                
+                this.animationId = null;
+                this.isAnimating = false;
+            }
+            
+            latLonToCanvas(lat, lon) {
+                const x = ((lon - this.mapBounds.minLon) / (this.mapBounds.maxLon - this.mapBounds.minLon)) * this.width;
+                const y = this.height - ((lat - this.mapBounds.minLat) / (this.mapBounds.maxLat - this.mapBounds.minLat)) * this.height;
+                return { x, y };
+            }
+            
+            drawMap() {
+                // 地図画像を描画
+                this.ctx.drawImage(this.mapImage, 0, 0, this.width, this.height);
+                
+                // グリッド線（デバッグ用）
+                this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+                this.ctx.lineWidth = 1;
+                
+                // 経度線
+                for (let lon = 125; lon <= 145; lon += 5) {
+                    const pos = this.latLonToCanvas(30, lon);
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(pos.x, 0);
+                    this.ctx.lineTo(pos.x, this.height);
+                    this.ctx.stroke();
+                    
+                    // ラベル
+                    this.ctx.fillStyle = '#333';
+                    this.ctx.font = '12px Arial';
+                    this.ctx.fillText(`${lon}°E`, pos.x + 5, 20);
+                }
+                
+                // 緯度線
+                for (let lat = 30; lat <= 45; lat += 5) {
+                    const pos = this.latLonToCanvas(lat, 125);
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, pos.y);
+                    this.ctx.lineTo(this.width, pos.y);
+                    this.ctx.stroke();
+                    
+                    // ラベル
+                    this.ctx.fillText(`${lat}°N`, 10, pos.y - 5);
+                }
+            }
+            
+            drawPressureCenters(lows, highs) {
+                // 低気圧中心（赤）
+                lows.forEach(low => {
+                    const pos = this.latLonToCanvas(low.lat, low.lon);
+                    
+                    // 中心点
+                    this.ctx.beginPath();
+                    this.ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2);
+                    this.ctx.fillStyle = '#CC0000';
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = '#FFF';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                    
+                    // 「低」ラベル
+                    this.ctx.fillStyle = '#FFF';
+                    this.ctx.font = 'bold 12px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.textBaseline = 'middle';
+                    this.ctx.fillText('低', pos.x, pos.y);
+                    
+                    // 気圧値
+                    this.ctx.fillStyle = '#CC0000';
+                    this.ctx.font = 'bold 14px Arial';
+                    this.ctx.fillText(`${low.pressure.toFixed(1)}`, pos.x, pos.y - 20);
+                    
+                    // 移動方向
+                    this.drawMovementArrow(pos.x, pos.y, low.movement.direction, low.movement.speed);
+                });
+                
+                // 高気圧中心（青）
+                highs.forEach(high => {
+                    const pos = this.latLonToCanvas(high.lat, high.lon);
+                    
+                    // 中心点
+                    this.ctx.beginPath();
+                    this.ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2);
+                    this.ctx.fillStyle = '#0066CC';
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = '#FFF';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                    
+                    // 「高」ラベル
+                    this.ctx.fillStyle = '#FFF';
+                    this.ctx.font = 'bold 12px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.textBaseline = 'middle';
+                    this.ctx.fillText('高', pos.x, pos.y);
+                    
+                    // 気圧値
+                    this.ctx.fillStyle = '#0066CC';
+                    this.ctx.font = 'bold 14px Arial';
+                    this.ctx.fillText(`${high.pressure.toFixed(1)}`, pos.x, pos.y - 20);
+                    
+                    // 移動方向
+                    this.drawMovementArrow(pos.x, pos.y, high.movement.direction, high.movement.speed);
+                });
+            }
+            
+            drawMovementArrow(x, y, direction, speed) {
+                const length = Math.min(speed * 0.5, 30);
+                const angle = (direction - 90) * Math.PI / 180; // 北を0度に調整
+                
+                const endX = x + length * Math.cos(angle);
+                const endY = y + length * Math.sin(angle);
+                
+                // 矢印の線
+                this.ctx.beginPath();
+                this.ctx.moveTo(x, y);
+                this.ctx.lineTo(endX, endY);
+                this.ctx.strokeStyle = '#333';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+                
+                // 矢印の頭
+                this.ctx.beginPath();
+                this.ctx.moveTo(endX, endY);
+                this.ctx.lineTo(
+                    endX - 8 * Math.cos(angle - Math.PI/6),
+                    endY - 8 * Math.sin(angle - Math.PI/6)
+                );
+                this.ctx.lineTo(
+                    endX - 8 * Math.cos(angle + Math.PI/6),
+                    endY - 8 * Math.sin(angle + Math.PI/6)
+                );
+                this.ctx.closePath();
+                this.ctx.fillStyle = '#333';
+                this.ctx.fill();
+            }
+            
+            drawIsobars(isobars) {
+                isobars.forEach(isobar => {
+                    const pos = this.latLonToCanvas(isobar.center.lat, isobar.center.lon);
+                    const radius = isobar.radius * (this.width / (this.mapBounds.maxLon - this.mapBounds.minLon)) / 111.32;
+                    
+                    this.ctx.beginPath();
+                    this.ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+                    this.ctx.strokeStyle = isobar.type === 'high' ? '#0066CC' : '#CC0000';
+                    this.ctx.lineWidth = 1.5;
+                    this.ctx.setLineDash([5, 3]);
+                    this.ctx.stroke();
+                    this.ctx.setLineDash([]);
+                    
+                    // 気圧値ラベル
+                    const labelX = pos.x + radius * Math.cos(Math.PI/4);
+                    const labelY = pos.y + radius * Math.sin(Math.PI/4);
+                    
+                    this.ctx.fillStyle = isobar.type === 'high' ? '#0066CC' : '#CC0000';
+                    this.ctx.font = '10px Arial';
+                    this.ctx.fillText(`${isobar.pressure} hPa`, labelX, labelY);
+                });
+            }
+            
+            drawWindField(winds) {
+                winds.forEach(wind => {
+                    const pos = this.latLonToCanvas(wind.lat, wind.lon);
+                    
+                    // 風速に応じた矢印の長さ
+                    const length = Math.min(wind.speed * 3, 40);
+                    const angle = (wind.direction - 90) * Math.PI / 180;
+                    
+                    // 風速が小さい場合は描画しない
+                    if (wind.speed < 1) return;
+                    
+                    // 矢印の線
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(pos.x, pos.y);
+                    this.ctx.lineTo(
+                        pos.x + length * Math.cos(angle),
+                        pos.y + length * Math.sin(angle)
+                    );
+                    this.ctx.strokeStyle = '#333';
+                    this.ctx.lineWidth = Math.min(wind.speed / 5, 3);
+                    this.ctx.stroke();
+                    
+                    // 羽根（風速の表現）
+                    const featherCount = Math.floor(wind.speed / 5);
+                    for (let i = 1; i <= featherCount; i++) {
+                        const featherPos = i / (featherCount + 1);
+                        const featherX = pos.x + length * featherPos * Math.cos(angle);
+                        const featherY = pos.y + length * featherPos * Math.sin(angle);
+                        
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(featherX, featherY);
+                        this.ctx.lineTo(
+                            featherX - 5 * Math.cos(angle + Math.PI/2),
+                            featherY - 5 * Math.sin(angle + Math.PI/2)
+                        );
+                        this.ctx.strokeStyle = '#333';
+                        this.ctx.lineWidth = 1;
+                        this.ctx.stroke();
+                    }
+                });
+            }
+            
+            drawWeatherConditions(location, weather, temperature, humidity) {
+                const locations = {
+                    kyoto: { name: "京都", pos: this.latLonToCanvas(35.0116, 135.7681) },
+                    nara: { name: "奈良", pos: this.latLonToCanvas(34.6851, 135.8048) },
+                    kamakura: { name: "鎌倉", pos: this.latLonToCanvas(35.3192, 139.5500) },
+                    hakata: { name: "博多", pos: this.latLonToCanvas(33.5902, 130.4017) },
+                    osaka: { name: "大坂", pos: this.latLonToCanvas(34.6937, 135.5023) },
+                    sendai: { name: "仙台", pos: this.latLonToCanvas(38.2682, 140.8694) }
+                };
+                
+                const loc = locations[location] || locations.kyoto;
+                
+                // 天気記号
+                const weatherSymbols = {
+                    sunny: '☀️',
+                    cloudy: '☁️',
+                    rainy: '🌧️',
+                    snowy: '❄️',
+                    stormy: '⛈️',
+                    foggy: '🌫️'
+                };
+                
+                // 場所マーカー
+                this.ctx.beginPath();
+                this.ctx.arc(loc.pos.x, loc.pos.y, 15, 0, Math.PI * 2);
+                this.ctx.fillStyle = 'rgba(76, 175, 80, 0.3)';
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#4CAF50';
+                this.ctx.lineWidth = 3;
+                this.ctx.stroke();
+                
+                // 天気情報
+                this.ctx.fillStyle = '#333';
+                this.ctx.font = 'bold 16px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText(loc.name, loc.pos.x, loc.pos.y - 25);
+                
+                this.ctx.font = '20px Arial';
+                this.ctx.fillText(weatherSymbols[weather] || '☀️', loc.pos.x, loc.pos.y + 5);
+                
+                this.ctx.font = '12px Arial';
+                this.ctx.fillText(`${temperature.toFixed(1)}°C`, loc.pos.x - 20, loc.pos.y + 25);
+                this.ctx.fillText(`${humidity}%`, loc.pos.x + 20, loc.pos.y + 25);
+                
+                // 雨の場合は雨域を表示
+                if (weather === 'rainy' || weather === 'stormy') {
+                    this.drawRainArea(loc.pos.x, loc.pos.y);
+                }
+            }
+            
+            drawRainArea(centerX, centerY) {
+                // 雨域の円
+                this.ctx.beginPath();
+                this.ctx.arc(centerX, centerY, 100, 0, Math.PI * 2);
+                this.ctx.fillStyle = 'rgba(0, 102, 204, 0.1)';
+                this.ctx.fill();
+                this.ctx.strokeStyle = 'rgba(0, 102, 204, 0.3)';
+                this.ctx.lineWidth = 2;
+                this.ctx.setLineDash([5, 5]);
+                this.ctx.stroke();
+                this.ctx.setLineDash([]);
+                
+                // 雨粒のアニメーション
+                for (let i = 0; i < 20; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const distance = Math.random() * 80;
+                    const dropX = centerX + distance * Math.cos(angle);
+                    const dropY = centerY + distance * Math.sin(angle);
+                    const length = 5 + Math.random() * 10;
+                    
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(dropX, dropY);
+                    this.ctx.lineTo(dropX, dropY + length);
+                    this.ctx.strokeStyle = 'rgba(0, 102, 204, 0.5)';
+                    this.ctx.lineWidth = 1;
+                    this.ctx.stroke();
+                }
+            }
+            
+            render(pressureField, location, weather, temperature, humidity) {
+                // キャンバスをクリア
+                this.ctx.clearRect(0, 0, this.width, this.height);
+                
+                // 地図を描画
+                this.drawMap();
+                
+                // 等圧線
+                this.drawIsobars(pressureField.isobars);
+                
+                // 風場
+                this.drawWindField(pressureField.winds);
+                
+                // 気圧中心
+                this.drawPressureCenters(pressureField.lows, pressureField.highs);
+                
+                // 天気条件
+                this.drawWeatherConditions(location, weather, temperature, humidity);
+                
+                // タイトル
+                this.ctx.fillStyle = '#1a237e';
+                this.ctx.font = 'bold 24px Arial';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText('平安時代天気図', 20, 40);
+                
+                const year = document.getElementById('yearSelect').value;
+                this.ctx.font = '16px Arial';
+                this.ctx.fillText(`西暦 ${year}年`, 20, 70);
+            }
+            
+            startAnimation(pressureField, location, weather, temperature, humidity) {
+                if (this.isAnimating) {
+                    cancelAnimationFrame(this.animationId);
+                }
+                
+                this.isAnimating = true;
+                let frameCount = 0;
+                
+                const animate = () => {
+                    frameCount++;
+                    
+                    // 10フレームごとに気圧場を更新
+                    if (frameCount % 10 === 0) {
+                        pressureField.updateTimeStep();
+                    }
+                    
+                    this.render(pressureField, location, weather, temperature, humidity);
+                    
+                    // アニメーション継続
+                    this.animationId = requestAnimationFrame(animate);
+                };
+                
+                animate();
+            }
+            
+            stopAnimation() {
+                if (this.isAnimating) {
+                    cancelAnimationFrame(this.animationId);
+                    this.isAnimating = false;
+                }
+            }
+        }
+        
+        // ==================== 4. 公式表示クラス ====================
+        class FormulaDisplay {
+            static showAllFormulas(engine, params) {
+                const container = document.getElementById('formulasList');
+                container.innerHTML = '';
+                
+                // 全ての公式を計算して表示
+                const formulas = [
+                    // 放射・温度系
+                    engine.radiativeEquilibrium(params.albedo),
+                    engine.radiativeForcing(params.deltaF),
+                    engine.lapseRateCorrection(params.temperature, params.elevation),
+                    
+                    // 気圧・高度系
+                    engine.hydrostaticBalance(params.pressure, params.density),
+                    engine.pressureAtHeight(params.pressure, params.elevation),
+                    engine.idealGasLaw(params.pressure, params.temperature),
+                    
+                    // 風の公式
+                    engine.coriolisParameter(params.latitude),
+                    engine.geostrophicWind(params.pressureGradient, params.latitude),
+                    engine.windSpeed(params.uWind, params.vWind),
+                    
+                    // 湿度・水蒸気
+                    engine.saturationVaporPressure(params.temperature),
+                    engine.relativeHumidity(params.vaporPressure, params.saturationPressure),
+                    engine.specificHumidity(params.vaporPressure, params.pressure),
+                    
+                    // 降水・雲
+                    engine.upwardMotionCondition(params.divergence),
+                    engine.rainfallEstimate(params.humidity, params.updraft),
+                    engine.cloudCoverEstimate(params.humidity),
+                    
+                    // 前線・気団
+                    engine.frontIntensity(params.temperatureGradient),
+                    engine.temperatureAdvection(params.vx, params.vy, params.dTdx, params.dTdy),
+                    
+                    // 大気安定度
+                    engine.dryAdiabaticLapseRate(),
+                    engine.stabilityCondition(params.envLapse, params.dryLapse),
+                    
+                    // 大循環・季節
+                    engine.solarAltitudeAngle(params.latitude, params.declination, params.hourAngle),
+                    engine.monsoonIndex(params.landTemp, params.seaTemp),
+                    
+                    // 誤差・補正
+                    engine.movingAverage(params.tempData, params.windowSize),
+                    engine.biasCorrection(params.rawTemp, params.rawMean, params.obsMean),
+                    engine.uncertaintyPropagation(params.sigma1, params.sigma2)
+                ];
+                
+                formulas.forEach(formula => {
+                    this.addFormulaCard(formula);
+                });
+            }
+            
+            static addFormulaCard(formula) {
+                const container = document.getElementById('formulasList');
+                
+                const card = document.createElement('div');
+                card.className = 'formula-card';
+                
+                let detailsHtml = '';
+                if (formula.details) {
+                    detailsHtml = '<div class="formula-details">';
+                    for (const [key, value] of Object.entries(formula.details)) {
+                        detailsHtml += `<strong>${key}:</strong> ${value}<br>`;
+                    }
+                    detailsHtml += '</div>';
+                }
+                
+                card.innerHTML = `
+                    <div class="formula-name">${formula.explanation}</div>
+                    <div class="formula-equation">${formula.formula}</div>
+                    <div>計算結果: <span class="formula-value">${typeof formula.value === 'number' ? formula.value.toFixed(3) : formula.value}</span></div>
+                    ${detailsHtml}
+                `;
+                
+                container.appendChild(card);
+            }
+        }
+        
+        // ==================== 5. アプリケーション初期化 ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            // 物理エンジンの初期化
+            const engine = new CompleteMeteorologicalEngine();
+            const pressureField = new DynamicPressureField();
+            const mapRenderer = new WeatherMapRenderer('weatherCanvas');
+            
+            // UI要素の取得
+            const yearSelect = document.getElementById('yearSelect');
+            const yearValue = document.getElementById('yearValue');
+            const tempSlider = document.getElementById('temperature');
+            const tempValue = document.getElementById('tempValue');
+            const humiditySlider = document.getElementById('humidity');
+            const humidityValue = document.getElementById('humidityValue');
+            const pressureSlider = document.getElementById('pressure');
+            const pressureValue = document.getElementById('pressureValue');
+            const ensoSlider = document.getElementById('enso');
+            const ensoValue = document.getElementById('ensoValue');
+            const eraDisplay = document.getElementById('eraDisplay');
+            const weatherDisplay = document.getElementById('weatherDisplay');
+            const locationDisplay = document.getElementById('locationDisplay');
+            
+            // 現在の選択状態
+            let currentLocation = 'kyoto';
+            let currentWeather = 'sunny';
+            let currentTemperature = 24.5;
+            let currentHumidity = 60;
+            let currentPressure = 1013;
+            let currentENSO = 0;
+            
+            // イベントリスナーの設定
+            yearSelect.addEventListener('input', function() {
+                const year = parseInt(this.value);
+                let era = "平安時代";
+                if (year < 794) era = "奈良時代";
+                else if (year < 1185) era = "平安時代";
+                else era = "鎌倉時代";
+                
+                yearValue.textContent = `${era} (${year}年)`;
+                eraDisplay.textContent = `${era} (西暦${year}年)`;
+            });
+            
+            tempSlider.addEventListener('input', function() {
+                currentTemperature = parseFloat(this.value);
+                tempValue.textContent = this.value;
+            });
+            
+            humiditySlider.addEventListener('input', function() {
+                currentHumidity = parseInt(this.value);
+                humidityValue.textContent = this.value;
+            });
+            
+            pressureSlider.addEventListener('input', function() {
+                currentPressure = parseInt(this.value);
+                pressureValue.textContent = this.value;
+            });
+            
+            ensoSlider.addEventListener('input', function() {
+                currentENSO = parseFloat(this.value);
+                ensoValue.textContent = this.value;
+            });
+            
+            // 場所選択ボタン
+            document.querySelectorAll('.location-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.location-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentLocation = this.dataset.location;
+                    locationDisplay.textContent = `場所: ${this.textContent}`;
+                    updateWeather();
+                });
+            });
+            
+            // 天気条件ボタン
+            document.querySelectorAll('.condition-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.condition-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentWeather = this.dataset.weather;
+                    
+                    const weatherNames = {
+                        sunny: '晴れ',
+                        cloudy: '曇り',
+                        rainy: '雨',
+                        snowy: '雪',
+                        stormy: '嵐',
+                        foggy: '霧'
+                    };
+                    
+                    weatherDisplay.textContent = `天気: ${weatherNames[currentWeather]}`;
+                    updateWeather();
+                });
+            });
+            
+            // 気象生成ボタン
+            document.getElementById('generateBtn').addEventListener('click', function() {
+                updateWeather();
+            });
+            
+            // アニメーションボタン
+            document.getElementById('animateBtn').addEventListener('click', function() {
+                mapRenderer.startAnimation(
+                    pressureField,
+                    currentLocation,
+                    currentWeather,
+                    currentTemperature,
+                    currentHumidity
+                );
+                this.innerHTML = '<i class="fas fa-pause"></i> アニメーション停止';
+                this.onclick = function() {
+                    mapRenderer.stopAnimation();
+                    this.innerHTML = '<i class="fas fa-play"></i> アニメーション開始';
+                    this.onclick = arguments.callee;
+                };
+            });
+            
+            // 公式表示ボタン
+            document.getElementById('formulaBtn').addEventListener('click', function() {
+                const params = {
+                    albedo: 0.3,
+                    deltaF: 1.5,
+                    temperature: currentTemperature,
+                    elevation: 50,
+                    pressure: currentPressure,
+                    density: 1.225,
+                    latitude: 35.0,
+                    pressureGradient: 2.0,
+                    uWind: 5.0,
+                    vWind: 2.0,
+                    vaporPressure: 10.0,
+                    saturationPressure: 20.0,
+                    humidity: currentHumidity,
+                    divergence: -0.5,
+                    updraft: 0.2,
+                    temperatureGradient: 5.0,
+                    vx: 3.0,
+                    vy: 1.0,
+                    dTdx: 0.1,
+                    dTdy: 0.05,
+                    envLapse: 5.0,
+                    dryLapse: 9.8,
+                    declination: 20.0,
+                    hourAngle: 12.0,
+                    landTemp: currentTemperature,
+                    seaTemp: currentTemperature - 2.0,
+                    tempData: [24.0, 24.5, 25.0, 24.8, 24.3],
+                    windowSize: 3,
+                    rawTemp: 24.5,
+                    rawMean: 24.0,
+                    obsMean: 24.2,
+                    sigma1: 0.5,
+                    sigma2: 0.3
+                };
+                
+                FormulaDisplay.showAllFormulas(engine, params);
+                
+                // スクロールして公式パネルを表示
+                document.getElementById('formulaPanel').scrollIntoView({ behavior: 'smooth' });
+            });
+            
+            // 天気図更新関数
+            function updateWeather() {
+                const pressureData = pressureField.generatePressureField(
+                    currentLocation,
+                    currentWeather,
+                    currentTemperature,
+                    currentHumidity,
+                    currentPressure,
+                    currentENSO
+                );
+                
+                mapRenderer.render(
+                    pressureData,
+                    currentLocation,
+                    currentWeather,
+                    currentTemperature,
+                    currentHumidity
+                );
+                
+                // アニメーションが実行中であれば更新
+                if (mapRenderer.isAnimating) {
+                    mapRenderer.stopAnimation();
+                    document.getElementById('animateBtn').innerHTML = '<i class="fas fa-play"></i> アニメーション開始';
+                    document.getElementById('animateBtn').onclick = function() {
+                        mapRenderer.startAnimation(
+                            pressureField,
+                            currentLocation,
+                            currentWeather,
+                            currentTemperature,
+                            currentHumidity
+                        );
+                        this.innerHTML = '<i class="fas fa-pause"></i> アニメーション停止';
+                        this.onclick = arguments.callee;
+                    };
+                }
+            }
+            
+            // 初期表示
+            updateWeather();
+            
+            console.log('平安時代気象再現システムが起動しました');
+            console.log('使用している物理公式: 放射平衡、地衡風、静水圧平衡、マグヌス式など全27公式');
+        });
+    </script>
+</body>
+</html>
