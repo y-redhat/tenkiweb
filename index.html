@@ -1,0 +1,250 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transformers.js 安定版 (GPU/CPU自動切替 + 詳細ログ)</title>
+    <style>
+        /* 前回と完全に同じスタイル */
+        body {
+            font-family: system-ui, sans-serif;
+            max-width: 700px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        #chat-box {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: #fafafa;
+            border-radius: 8px;
+        }
+        .msg {
+            margin-bottom: 1rem;
+            line-height: 1.5;
+        }
+        .user {
+            text-align: right;
+            color: #1a73e8;
+        }
+        .assistant {
+            text-align: left;
+            color: #202124;
+        }
+        .input-area {
+            display: flex;
+            gap: 8px;
+        }
+        #user-input {
+            flex: 1;
+            padding: 10px;
+            font-size: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 1rem;
+            background: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        button:disabled {
+            background: #aaa;
+            cursor: not-allowed;
+        }
+        .status {
+            color: #5f6368;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            white-space: pre-line;
+        }
+        .warning {
+            color: #b85c00;
+        }
+        .error {
+            color: #d32f2f;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧠 Transformers.js 対話 (安定ロード版)</h1>
+    <div id="status" class="status">初期化を開始します...</div>
+    <div id="chat-box"></div>
+    <div class="input-area">
+        <input type="text" id="user-input" placeholder="メッセージを入力..." disabled />
+        <button id="send-btn" disabled>送信</button>
+    </div>
+
+    <script type="module">
+        import { pipeline, TextStreamer } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.5';
+
+        // より軽量で安定動作するモデル (約400MB)
+        const MODEL_ID = 'onnx-community/Llama-3.2-1B-Instruct-q4f16';
+        
+        const statusDiv = document.getElementById('status');
+        const chatBox = document.getElementById('chat-box');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+
+        let generator = null;
+
+        function addMessage(role, content) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `msg ${role}`;
+            msgDiv.textContent = `${role === 'user' ? 'あなた' : 'AI'}: ${content}`;
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function updateStatus(text, isError = false, isWarning = false) {
+            statusDiv.innerHTML = text;
+            statusDiv.className = 'status';
+            if (isError) statusDiv.classList.add('error');
+            if (isWarning) statusDiv.classList.add('warning');
+        }
+
+        async function initModel() {
+            try {
+                updateStatus('🔍 環境をチェック中...');
+
+                // まずWebGPUを試す
+                let device = 'webgpu';
+                let loadSuccess = false;
+                
+                for (let attempt = 1; attempt <= 2; attempt++) {
+                    try {
+                        updateStatus(`⏳ モデルロード試行中 (${attempt}/2) - デバイス: ${device}<br>
+                        ※ 初回はモデルファイル(約400MB)をダウンロードするため、数分かかる場合があります。<br>
+                        プログレスバーは表示されませんが、裏で通信しています。`);
+                        
+                        // 進行状況を擬似的に示すため、タイマーでメッセージ更新
+                        const progressInterval = setInterval(() => {
+                            const currentText = statusDiv.innerHTML;
+                            if (!currentText.includes('⏳')) return;
+                            const dots = (currentText.match(/\./g) || []).length;
+                            const newDots = '.'.repeat((dots % 3) + 1);
+                            statusDiv.innerHTML = currentText.replace(/\.+$/, newDots);
+                        }, 500);
+
+                        generator = await pipeline(
+                            'text-generation',
+                            MODEL_ID,
+                            {
+                                device: device,
+                                dtype: 'q4',
+                                progress_callback: (progress) => {
+                                    if (progress.status === 'downloading') {
+                                        const percent = progress.progress ? (progress.progress / 100).toFixed(1) : '?';
+                                        updateStatus(`📥 モデルダウンロード中... ${percent}%<br>ファイル: ${progress.file || ''}`);
+                                    } else if (progress.status === 'loading') {
+                                        updateStatus('📦 モデルをメモリに展開中...');
+                                    }
+                                }
+                            }
+                        );
+                        
+                        clearInterval(progressInterval);
+                        loadSuccess = true;
+                        break;
+                    } catch (e) {
+                        console.warn(`デバイス ${device} でのロード失敗:`, e);
+                        if (attempt === 1) {
+                            device = 'wasm';
+                            updateStatus('⚠️ WebGPUでのロードに失敗しました。CPUモード(WebAssembly)で再試行します...', false, true);
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        } else {
+                            throw e;
+                        }
+                    }
+                }
+
+                if (!loadSuccess) {
+                    throw new Error('すべてのデバイスでのロードに失敗しました。');
+                }
+
+                updateStatus(`✅ 準備完了！ (実行デバイス: ${device === 'webgpu' ? 'GPU' : 'CPU'}) - メッセージを入力してください。`);
+                userInput.disabled = false;
+                sendBtn.disabled = false;
+                userInput.focus();
+
+            } catch (error) {
+                console.error('致命的エラー:', error);
+                let errorMsg = `❌ モデルの初期化に失敗しました。<br>`;
+                if (error.message.includes('Failed to fetch')) {
+                    errorMsg += `ネットワークエラー：モデルファイルのダウンロードに失敗しました。インターネット接続を確認し、ページを再読み込みしてください。`;
+                } else if (error.message.includes('Out of memory')) {
+                    errorMsg += `メモリ不足：このデバイスではモデルを実行できません。別のブラウザまたは軽量モデルをお試しください。`;
+                } else {
+                    errorMsg += `詳細: ${error.message}`;
+                }
+                errorMsg += `<br><br>💡 対処法:<br>
+                - 数分待ってからページを再読み込み<br>
+                - シークレットモードで開き直す<br>
+                - 別のブラウザ(Chrome/Edge)を試す`;
+                updateStatus(errorMsg, true);
+            }
+        }
+
+        async function handleSend() {
+            const message = userInput.value.trim();
+            if (!message || !generator) return;
+
+            userInput.disabled = true;
+            sendBtn.disabled = true;
+            addMessage('user', message);
+            userInput.value = '';
+
+            const streamMsg = document.createElement('div');
+            streamMsg.className = 'msg assistant';
+            streamMsg.textContent = 'AI: ';
+            chatBox.appendChild(streamMsg);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            let fullReply = '';
+
+            try {
+                const messages = [{ role: 'user', content: message }];
+                
+                const streamer = new TextStreamer(generator.tokenizer, {
+                    skip_prompt: true,
+                    callback_function: (text) => {
+                        fullReply += text;
+                        streamMsg.textContent = `AI: ${fullReply}`;
+                        chatBox.scrollTop = chatBox.scrollHeight;
+                    }
+                });
+
+                await generator(messages, {
+                    max_new_tokens: 512,
+                    temperature: 0.7,
+                    do_sample: true,
+                    streamer: streamer
+                });
+
+            } catch (error) {
+                streamMsg.textContent = `AI: [エラー] ${error.message}`;
+                console.error(error);
+            } finally {
+                userInput.disabled = false;
+                sendBtn.disabled = false;
+                userInput.focus();
+            }
+        }
+
+        sendBtn.addEventListener('click', handleSend);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !sendBtn.disabled) handleSend();
+        });
+
+        // スタート
+        initModel();
+    </script>
+</body>
+</html>

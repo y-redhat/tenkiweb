@@ -1,2 +1,0 @@
-# tenkiweb
-tennki
